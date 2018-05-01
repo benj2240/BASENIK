@@ -1,6 +1,6 @@
 # BASENIK
 
-BASENIK is a tool for writing programs in [Beatnik](https://esolangs.org/wiki/Beatnik).
+BASENIK is a tool for writing programs in [Beatnik](https://esolangs.org/wiki/Beatnik). You can use the tool online [here](https://benj2240.github.io/BASENIK/).
 
 ## Current features:
 1. Given the source of a program written in Beatnik, visually display the values and, if applicable, the commands represented by each word
