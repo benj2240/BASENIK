@@ -1,0 +1,233 @@
+<script src="https://cdn.jsdelivr.net/npm/vue@2.5.16/dist/vue.js"></script>
+<!-- <script type="text/javascript" src="vue.js"></script> -->
+<div id="app">
+  <textarea v-model="source"></textarea>
+  <div class="box" >
+    <div v-for="(token, index) in tokens"
+        :class="index===programPointer ? 'active' : 'inactive'">
+      {{token}}
+    </div>
+  </div>
+  <div class="box">
+    <div v-for="command in commands">
+      {{command}}
+    </div>
+  </div>
+  <button v-on:click="reset">Reset</button>
+  <button v-on:click="stepForward">Step</button>
+  <button v-on:click="execute">Run</button>
+  <div class="box">
+    <span v-for="value in stack">
+      {{value}} ({{String.fromCharCode(value)}})
+    </span>
+  </div>
+  <input type=text v-model="inputString"></input>
+  <div>
+    <span v-for="(char, index) in inputCharacters"
+        :class="index===inputPointer ? 'active' : 'inactive'">
+      {{char}}
+    </span>
+  </div>
+  <p>{{output}}</p>
+</div>
+
+<style type="text/css">
+textarea {
+  width: 50em;
+  height: 5em;
+}
+
+.box {
+  border: solid 1px;
+}
+
+.active {
+  background-color: green;
+}
+
+.inactive {
+  background-color: red;
+}
+</style>
+
+<script type="text/javascript">
+const testPrograms = {
+  push: "K QQQQQQK JA", // push, output A
+  drop: "K QQQQQQK K ZZZZZZZ BB JA", // push, drop, output A
+  add: "K QQQ K QQQK KD JA", // push, add, output A
+  input: "J JA", // input, output echo
+  output: "K QQQQQQK JA", // push, output A
+  subtract: "K QQQQQQQK K Z Q JA", // push, subtract, output A
+  swap: "K QQQQQQK K QQQQQQQK QA JA JA", // push AK, swap, output AK
+  dup: "K QQQQQQK QD JA JA", // push, dup, output AA
+  halt: "K QQQQQQK JA QKD K QQQQQQK JA", // push output A
+  jumpNotZero: "K QQQQQQK K A QF A QKD JA", // push A, jump over halt, output A
+  jumpZero: "K QQQQQQK K A K A Q QB A QKD JA", // push A, jump over halt, output A
+  fallNotZero: "K QQQQQQK K A QF D JA QKD K A JJ K", // push A, jump over output, fall back to output, output A
+  fallZero: "K QQQQQQK K A QF D JA QKD K A K A Q QK JA", // push A, jump over output, fall back to output, output A
+};
+
+const tileScores = {
+  'A':1, 'E':1, 'I':1, 'L':1, 'N':1, 'O':1, 'R':1, 'S':1, 'T':1, 'U':1,
+  'D':2, 'G':2,
+  'B':3, 'C':3, 'M':3, 'P':3,
+  'F':4, 'H':4, 'V':4, 'W':4, 'Y':4,
+  'K':5,
+  'J':8, 'X':8,
+  'Q':10,'Z':10,
+}
+
+const commands = {
+  5: 'push',
+  6: 'drop',
+  7: 'add',
+  8: 'input',
+  9: 'output',
+  10:'subtract',
+  11:'swap',
+  12:'dup',
+  13:'jump-zero',
+  14:'jump-not-zero',
+  15:'fall-zero',
+  16:'fall-not-zero',
+  17:'halt',
+}
+
+const scrabbleScore = function scrabbleScore(word) {
+  return word.toUpperCase()
+    .match(/[A-Z]/g)
+    .map(tile => tileScores[tile])
+    .reduce((sum, tileScore) => sum + tileScore);
+};
+
+const vm = new Vue({
+  el: '#app',
+  data: {
+    source: testPrograms["fallZero"],
+    inputString: "asdf",
+    inputPointer: 0,
+    programPointer: 0,
+    stack: [],
+    output: "",
+    halting: false,
+  },
+  computed: {
+    tokens: function() {
+      return this.source.match(/[A-Z]+/ig);
+    },
+    scrabbleScores: function() {
+      return this.tokens
+        .map(token => scrabbleScore(token));
+    },
+    commands: function() {
+      return this.scrabbleScores
+        .map(value => `${value}: ${commands[value] || "(no-op)"}`);
+    },
+    inputCharacters: function() {
+      return this.inputString.split("");
+    },
+  },
+  methods: {
+    reset: function() {
+      this.inputPointer = 0;
+      this.programPointer = 0;
+      this.stack = [];
+      this.output = "",
+      this.halting = false;
+    },
+    execute: function() {
+      while(!this.halting) {
+        this.stepForward();
+      }
+    },
+    stepForward: function() {
+      let char;
+      let value;
+
+      if (this.halting)
+        return;
+
+      const commandValue = this.scrabbleScores[this.programPointer];
+      const command = commands[commandValue];
+
+      if (commandValue == undefined) {
+        this.halting = true;
+        return;
+      }
+
+      switch(command) {
+        case "push":
+          this.programPointer += 1;
+          value = this.scrabbleScores[this.programPointer];
+          this.stack.push(value);
+          break;
+        case "drop":
+          this.stack.pop();
+          break;
+        case "add":
+          const augend = this.stack.pop();
+          const added = this.stack.pop();
+          this.stack.push(augend + added);
+          break;
+        case "subtract":
+          const subtrahend = this.stack.pop();
+          const minuend = this.stack.pop();
+          this.stack.push(minuend - subtrahend);
+          break;
+        case "input":
+          char = this.inputCharacters[this.inputPointer];
+          this.inputPointer += 1;
+          this.stack.push(char.charCodeAt(0));
+          break;
+        case "output":
+          char = String.fromCharCode(this.stack.pop());
+          this.output += char;
+          break;
+        case "swap":
+          const top = this.stack.pop();
+          const bottom = this.stack.pop();
+          this.stack.push(top);
+          this.stack.push(bottom);
+          break;
+        case "dup":
+          value = this.stack.pop();
+          this.stack.push(value);
+          this.stack.push(value);
+          break;
+        case "jump-zero":
+          value = this.stack.pop();
+          this.programPointer += 1;
+          if (value == 0)
+            this.programPointer += this.scrabbleScores[this.programPointer];
+          break;
+        case "jump-not-zero":
+          value = this.stack.pop();
+          this.programPointer += 1;
+          if (value != 0)
+            this.programPointer += this.scrabbleScores[this.programPointer];
+          break;
+        case "fall-zero":
+          value = this.stack.pop();
+          this.programPointer += 1;
+          if (value == 0)
+            this.programPointer -= this.scrabbleScores[this.programPointer] + 1;
+          break;
+        case "fall-not-zero":
+          value = this.stack.pop();
+          this.programPointer += 1;
+          if (value != 0)
+            this.programPointer -= this.scrabbleScores[this.programPointer] + 1;
+          break;
+        case "halt":
+          this.halting = true;
+          break;
+        // anything not in the commands dictionary is a no-op
+        case undefined:
+          break;
+        default: throw "not implemented: " + command;
+      }
+      this.programPointer += 1;
+    },
+  },
+});
+</script>
