@@ -9,7 +9,8 @@
     </div>
   </div>
   <div class="box">
-    <div v-for="command in commands">
+    <div v-for="(command, index) in commands"
+         :class="index===programPointer ? 'active' : 'inactive'">
       {{command}}
     </div>
   </div>
@@ -42,11 +43,11 @@ textarea {
 }
 
 .active {
-  background-color: green;
+  background-color: yellow;
 }
 
 .inactive {
-  background-color: red;
+  background-color: white;
 }
 </style>
 
